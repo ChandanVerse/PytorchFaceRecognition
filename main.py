@@ -1,4 +1,6 @@
 import torch, os, glob, numpy as np, cv2, argparse
+from typing import Union, Tuple, List, Optional
+from numpy import ndarray
 from core.detection import RetinaDetector, CascadeDetector
 from core.recognition import ArcRecognizer
 from numpy.linalg import norm
@@ -44,7 +46,11 @@ class Handler():
                 glob.glob(os.path.join(parent_folder_path, identity_folder) + '/*.jpg'):
                 
                 img = cv2.imread(file, cv2.IMREAD_COLOR)
+                if img is None or self.detector is None:
+                    continue
                 faces, landms = self.detector.detect(img)
+                if faces is None or len(faces) == 0:
+                    continue
                 # fool proof for many faces detected in one image (registration will denied this)
                 for idx in range(len(faces)):
                     # extract face bounding box
@@ -86,7 +92,12 @@ class Handler():
         This function take in an image, process any face detected within and return 
         a frame with face's bounding boxes, name and confidence score
     """
-    def recognize(self, img=cv2.imread('', cv2.IMREAD_COLOR)):
+    def recognize(self, img: Optional[ndarray] = None) -> Optional[ndarray]:
+        if img is None:
+            return None
+        if self.detector is None:
+            print("No detector initialized")
+            return img
         # detect face from image
         faces, landms = self.detector.detect(img)
         # iterate through each image detected in frame
@@ -100,7 +111,7 @@ class Handler():
             face_frame = cv2.resize(face_frame, (112, 112), interpolation=cv2.INTER_AREA)
             # get 'this' face landmarks
             if self.backend == 'retina':
-                landmk = landms[idx]
+                landmk = [landm * self.image_size[0] for landm in landms[idx]]
             elif self.backend == 'opencv':
                 landmk = []
             # get input blob
@@ -142,24 +153,31 @@ class Handler():
                 # print()
             
             # draw processed result
-            cv2.rectangle(img, (x1, y1), (x2, y2), (0,255,255), 2)
-            cv2.putText(img, 'Name: ' + match_name, (x1, y1 - 10), cv2.FONT_HERSHEY_COMPLEX, .4, (255,255,255), 1)
-            cv2.putText(img, 'Confidence: ' + str(match_score), (x1, y1 - 25), cv2.FONT_HERSHEY_COMPLEX, .4, (255,255,255), 1)
+            cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (0,255,255), 2)
+            cv2.putText(img, 'Name: ' + match_name, (int(x1), int(y1 - 10)), cv2.FONT_HERSHEY_COMPLEX, .4, (255,255,255), 1)
+            cv2.putText(img, 'Confidence: ' + str(match_score), (int(x1), int(y1 - 25)), cv2.FONT_HERSHEY_COMPLEX, .4, (255,255,255), 1)
         return img
         
 
     def cal_and_app_feature(self, features, identity_name):
         if len(features) == 0:
             return
-        for f in feature:
+        for f in features:
             self.face_database.append((identity_name, f))
         mean_f = np.zeros((1, 1024))
         mean_f = np.mean(features, axis=0)
         self.mean_face_database.append((identity_name, mean_f))
 
-    def register_identity(self, img=cv2.imread('', cv2.IMREAD_COLOR), identity=''):
+    def register_identity(self, img: Optional[ndarray] = None, identity: str = '') -> Tuple[List, Optional[ndarray]]:
+        if img is None:
+            return [], None
+        if self.detector is None:
+            print("No detector initialized")
+            return [], img
         # detect face from image
         faces, landms = self.detector.detect(img)
+        if faces is None or landms is None:
+            return [], img
         # initialize parameters
         msg = ''
         # check if only one face detected in frame
@@ -184,8 +202,9 @@ class Handler():
                 # get face feature
                 feat = self.arcface.forward(blob)
 
-                cv2.rectangle(img, (x1, y1), (x2, y2), (0,0,255), 2)
-                cv2.putText(img, str(faces[idx][4]), (x1, y1 + 10), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0,0,0))
+                cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (0,0,255), 2)
+                if len(faces[idx]) > 4:  # Check if confidence exists
+                    cv2.putText(img, str(faces[idx][4]), (int(x1), int(y1 + 10)), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0,0,0))
                 # print(type(feat), type(img))
                 self.database_state = False
                 return feat, img
@@ -245,8 +264,9 @@ if __name__ == '__main__':
                                 original)
                     face_count += 1
                 print('Press any key to continue registering!')
-                cv2.imshow('frame', ret_frame)
-                cv2.waitKey(0)
+                if ret_frame is not None:
+                    cv2.imshow('frame', ret_frame)
+                    cv2.waitKey(0)
             cv2.destroyAllWindows()
             args['mode'] = 1
         # face recognition
@@ -260,8 +280,9 @@ if __name__ == '__main__':
                     break
                 ret_frame = handler.recognize(frame)
                 # show result if process registering success
-                cv2.imshow('Recognition', ret_frame)
-                if cv2.waitKey(5) == ord(str('q')):
-                    break
+                if ret_frame is not None:
+                    cv2.imshow('Recognition', ret_frame)
+                    if cv2.waitKey(5) == ord(str('q')):
+                        break
             cv2.destroyAllWindows()
             STATE = False

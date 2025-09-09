@@ -44,19 +44,21 @@ class ArcRecognizer():
         #                      borderValue=0.0)
         # # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         # #
-        img_flip = np.fliplr(img)
-        # print(img.shape[:2], img_flip.shape[:2], sep='\n')
-        # cv2.imshow('ori', rimg)
-        # cv2.imshow('fimg', img_flip)
-        # cv2.imshow('rimg', img)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
-        
-        img = np.transpose(img, (2, 0, 1))  # 3*112*112, RGB
+        if isinstance(img, np.ndarray):
+            img_flip = np.fliplr(img.copy())
+            # print(img.shape[:2], img_flip.shape[:2], sep='\n')
+            # cv2.imshow('ori', rimg)
+            # cv2.imshow('fimg', img_flip)
+            # cv2.imshow('rimg', img)
+            # cv2.waitKey(0)
+            # cv2.destroyAllWindows()
+            
+            img = np.transpose(img.copy(), (2, 0, 1))  # 3*112*112, RGB
         img_flip = np.transpose(img_flip, (2, 0, 1))
         input_blob = np.zeros((2, 3, self.image_size[1], self.image_size[0]), dtype=np.uint8)
-        input_blob[0] = img
-        input_blob[1] = img_flip
+        if isinstance(img, np.ndarray):
+            input_blob[0] = img
+            input_blob[1] = img_flip
         return input_blob
 
     def forward(self, input=np.zeros((2, 3, 112, 112), dtype=np.uint8)):

@@ -78,11 +78,11 @@ def _crop(image, boxes, labels, landm, img_dim):
 
 def _distort(image):
 
-    def _convert(image, alpha=1, beta=0):
+    def _convert(image, alpha: float = 1.0, beta: int = 0) -> None:
         tmp = image.astype(float) * alpha + beta
         tmp[tmp < 0] = 0
         tmp[tmp > 255] = 255
-        image[:] = tmp
+        image[:] = tmp.astype(np.uint8)
 
     image = image.copy()
 
@@ -90,7 +90,7 @@ def _distort(image):
 
         #brightness distortion
         if random.randrange(2):
-            _convert(image, beta=random.uniform(-32, 32))
+            _convert(image, beta=int(random.uniform(-32, 32)))
 
         #contrast distortion
         if random.randrange(2):
@@ -114,7 +114,7 @@ def _distort(image):
 
         #brightness distortion
         if random.randrange(2):
-            _convert(image, beta=random.uniform(-32, 32))
+            _convert(image, beta=int(random.uniform(-32, 32)))
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 

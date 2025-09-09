@@ -79,7 +79,7 @@ class MultiBoxLoss(nn.Module):
         # Shape: [batch,num_priors,10]
         pos1 = conf_t > zeros
         num_pos_landm = pos1.long().sum(1, keepdim=True)
-        N1 = max(num_pos_landm.data.sum().float(), 1)
+        N1 = torch.max(torch.tensor([num_pos_landm.data.sum().float(), 1.0]))
         pos_idx1 = pos1.unsqueeze(pos1.dim()).expand_as(landm_data)
         landm_p = landm_data[pos_idx1].view(-1, 10)
         landm_t = landm_t[pos_idx1].view(-1, 10)
@@ -117,7 +117,7 @@ class MultiBoxLoss(nn.Module):
         loss_c = F.cross_entropy(conf_p, targets_weighted, reduction='sum')
 
         # Sum of losses: L(x,c,l,g) = (Lconf(x, c) + αLloc(x,l,g)) / N
-        N = max(num_pos.data.sum().float(), 1)
+        N = torch.max(torch.tensor([num_pos.data.sum().float(), 1.0]))
         loss_l /= N
         loss_c /= N
         loss_landm /= N1

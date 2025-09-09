@@ -95,20 +95,20 @@ def py_cpu_nms(dets, thresh):
     return keep
 
 class PriorBox(object):
-    def __init__(self, cfg=cfg_mnet, image_size=None, phase='train'):
+    def __init__(self, cfg=cfg_mnet, image_size=(640, 640), phase='train'):
         super(PriorBox, self).__init__()
         self.min_sizes = cfg['min_sizes']
         self.steps = cfg['steps']
         self.clip = cfg['clip']
-        self.image_size = image_size
-        self.feature_maps = [[ceil(self.image_size[0]/step), ceil(self.image_size[1]/step)] for step in self.steps]
+        self.image_size = image_size if image_size is not None else (640, 640)
+        self.feature_maps = [[int(ceil(self.image_size[0]/float(step))), int(ceil(self.image_size[1]/float(step)))] for step in self.steps]
         self.name = "s"
 
     def forward(self):
         anchors = []
         for k, f in enumerate(self.feature_maps):
             min_sizes = self.min_sizes[k]
-            for i, j in product(range(f[0]), range(f[1])):
+            for i, j in product(range(int(f[0])), range(int(f[1]))):
                 for min_size in min_sizes:
                     s_kx = min_size / self.image_size[1]
                     s_ky = min_size / self.image_size[0]

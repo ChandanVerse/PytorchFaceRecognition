@@ -46,7 +46,6 @@ class TorchRetina(nn.Module):
         self.phase = phase
 
         # init net
-        backbone = None
         if backbone_name == 'mnet25':
             backbone = MobileNetV1()
             checkpoint = torch.load('weights/mobilenetV1X0.25_pretrain.tar', map_location=torch.device('cpu'))
@@ -60,6 +59,9 @@ class TorchRetina(nn.Module):
         elif backbone_name == 'rnet50':
             import torchvision.models as models
             backbone = models.resnet50(pretrained=pretrain)
+        else:
+            raise ValueError(f"Unsupported backbone: {backbone_name}")
+            
         self.body = _utils.IntermediateLayerGetter(backbone, cfg['return_layers'])
         in_channels_stage2 = cfg['in_channel']
         in_channels_list = [

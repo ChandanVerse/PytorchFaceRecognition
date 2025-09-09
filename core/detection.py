@@ -49,11 +49,8 @@ def remove_prefix(state_dict, prefix):
 
 def load_model(model, pretrained_path):
     print('Loading pretrained model from {}'.format(pretrained_path))
-    if not torch.cuda.is_available():
-        pretrained_dict = torch.load(pretrained_path, map_location=lambda storage, loc: storage)
-    else:
-        device = torch.cuda.current_device()
-        pretrained_dict = torch.load(pretrained_path, map_location=lambda storage, loc: storage.cuda(device))
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    pretrained_dict = torch.load(pretrained_path, map_location=device)
     if "state_dict" in pretrained_dict.keys():
         pretrained_dict = remove_prefix(pretrained_dict['state_dict'], 'module.')
     else:
@@ -66,7 +63,7 @@ class RetinaDetector():
         # model initialization
         torch.set_grad_enabled(False)
         self.net = TorchRetina()
-        self.net = load_model(self.net, 'weights\mobilenet0.25_Final.pth')
+        self.net = load_model(self.net, 'weights/mobilenet0.25_Final.pth')
         self.net.eval()
         cudnn.benchmark = True
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -80,13 +77,15 @@ class RetinaDetector():
         self.p_top_k = 5000
         self.p_keep_top_k = 750
 
-    def detect(self, frame=cv.imread('', cv.IMREAD_COLOR)):
+    def detect(self, frame=None):
+        if frame is None:
+            return [], []
         img = np.float32(frame)
 
         # processing
-        im_height, im_width, _ = img.shape
-        scale = torch.Tensor([img.shape[1], img.shape[0], img.shape[1], img.shape[0]])
-        img -= (104, 117, 123)
+        im_height, im_width = frame.shape[:2]
+        scale = torch.Tensor([im_width, im_height, im_width, im_height])
+        img = img - np.array([104, 117, 123])
         img = img.transpose(2, 0, 1)
         img = torch.from_numpy(img).unsqueeze(0)
         img = img.to(self.device)
@@ -126,7 +125,7 @@ class RetinaDetector():
         scores = scores[order]
 
         # do NMS
-        dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
+        dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32)
         keep = py_cpu_nms(dets, self.nms_thresh)
         dets = dets[keep, :]
         landms = landms[keep]
@@ -208,10 +207,12 @@ class RetinaDetector():
     
 class CascadeDetector():
     def __init__(self) -> None:
-        self.face_cascade = cv.CascadeClassifier('weights\haarcascade_profileface.xml')
+        self.face_cascade = cv.CascadeClassifier('weights/haarcascade_profileface.xml')
         
-    def detect(self, frame=cv.imread('', cv.IMREAD_COLOR)):
-        img = cv.cvtColor(frame.copy(), cv.COLOR_BGR2GRAY)
+    def detect(self, frame=None):
+        if frame is None:
+            return [], []
+        img = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
         faces = self.face_cascade.detectMultiScale(img, 1.3, 4)
         return faces, []
 

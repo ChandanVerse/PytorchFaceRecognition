@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def conv_bn(inp, oup, stride = 1, leaky = 0):
+def conv_bn(inp, oup, stride = 1, leaky: float = 0.0):
     return nn.Sequential(
         nn.Conv2d(inp, oup, 3, stride, 1, bias=False),
         nn.BatchNorm2d(oup),
@@ -27,7 +27,7 @@ def conv_bn_no_relu(inp, oup, stride):
         nn.BatchNorm2d(oup),
     )
 
-def conv_bn1X1(inp, oup, stride, leaky=0):
+def conv_bn1X1(inp, oup, stride, leaky: float = 0.0):
     return nn.Sequential(
         nn.Conv2d(inp, oup, 1, stride, padding=0, bias=False),
         nn.BatchNorm2d(oup),

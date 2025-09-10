@@ -27,11 +27,20 @@ args = parser.parse_args()
 
 if not os.path.exists(args.save_folder):
     os.mkdir(args.save_folder)
-cfg = None
+
+# Initialize configuration
 if args.network == "mobile0.25":
     cfg = cfg_mnet
 elif args.network == "resnet50":
     cfg = cfg_re50
+else:
+    raise ValueError('Must provide valid network name')
+
+if cfg is None:
+    raise ValueError('Failed to initialize network configuration')
+
+# Type checking to help Pylance
+cfg = dict(cfg)
 
 rgb_mean = (104, 117, 123) # bgr order
 num_classes = 2

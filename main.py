@@ -1,4 +1,10 @@
 import torch, os, glob, numpy as np, cv2, argparse
+import torch
+import cv2
+import os
+import glob
+import numpy as np
+import argparse
 from typing import Union, Tuple, List, Optional
 from numpy import ndarray
 from core.detection import RetinaDetector, CascadeDetector
@@ -215,74 +221,102 @@ class Handler():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Facial Recognition Application')
     parser.add_argument('--mode', '-m', type=int, default=0, help='0 - register new face into system, 1 - face recognition')
-    parser.add_argument('--imgs', '-i', type=str, default='', help='if empty, auto search for webcam, else - a path to a folder contains images of new face')
-    parser.add_argument('--database', '-dp', type=str, default='database', help='Path to parent \'database\' path, contain sub-folders in which contain face images')
+    parser.add_argument('--imgs', '-i', type=str, default='', help='if empty, auto search for webcam, else - path to image file')
+    parser.add_argument('--database', '-dp', type=str, default='database', help='Path to database directory containing identity folders')
     parser.add_argument('--backend', '-dbe', type=str, default='retina', help='Backend for face detection')
     args = vars(parser.parse_args())
     
-    # # initialize main handler
+    # Initialize handler
     handler = Handler(args['database'], args['backend'])
 
-    # # initialize program
-    STATE = True
-    FACE_NUM_THRESH = 20
-    while STATE:
-        cam = cv2.VideoCapture(0)
-        # face registering
+    # Check if input is image file or video
+    if args['imgs'] and os.path.isfile(args['imgs']):
+        # Process single image
+        img = cv2.imread(args['imgs'])
+        if img is None:
+            print(f"Could not read image: {args['imgs']}")
+            exit(1)
+        
         if args['mode'] == 0:
-            # initialaize parameters
-            # identity_folder_path = input('Identity folder path(with forward "/" slash): ')
-            database_path = args['database']
+            # Registration mode for single image
             identity_name = input('Input identity\'s name: ')
-            identity_path = os.path.normpath(os.path.join(database_path + '/' + identity_name))
-            # check if identity folder exist, create if not
+            identity_path = os.path.normpath(os.path.join(args['database'], identity_name))
             if not os.path.exists(identity_path):
-                os.mkdir(identity_path)
-            # get current number of images belong to identity (if exist)
-            face_count = len(glob.glob(os.path.join(identity_path, '/*.png')) + \
-            glob.glob(os.path.join(identity_path, '/*.jpg')))
-            register_count = 0
-            features = []
-            # loop
-            while True:
-                ret, frame = cam.read()
-                original = frame.copy()
-                if not ret:
-                    handler.cal_and_app_feature(features, identity_name)
-                    break
-                if register_count > 20 or face_count > 30:
-                    handler.cal_and_app_feature(features, identity_name)
-                    print('Faces belong to identity exceeded require threshold, delete old images or continue with normal functionality!')
-                    break
-                feature, ret_frame = handler.register_identity(frame)
-                # show result if process registering success
-                if len(feature) != 0:
-                    # append to current feature vector (of one identity)
-                    features.append(feature)
-                    # save image for later database initialization
-                    cv2.imwrite(os.path.normpath(os.path.join(database_path + '/' + identity_name, identity_name + '_' + str(face_count) + '.png')),
-                                original)
-                    face_count += 1
-                print('Press any key to continue registering!')
-                if ret_frame is not None:
-                    cv2.imshow('frame', ret_frame)
-                    cv2.waitKey(0)
-            cv2.destroyAllWindows()
-            args['mode'] = 1
-        # face recognition
-        elif args['mode'] == 1:
-            # re-initialize face database in case of new registration
-            handler.init_identity_database(args['database'])
-            # loop
-            while True:
-                ret, frame = cam.read()
-                if not ret:
-                    break
-                ret_frame = handler.recognize(frame)
-                # show result if process registering success
-                if ret_frame is not None:
-                    cv2.imshow('Recognition', ret_frame)
-                    if cv2.waitKey(5) == ord(str('q')):
+                os.makedirs(identity_path)
+            
+            # Register the face
+            features, processed_img = handler.register_identity(img, identity_name)
+            if len(features) > 0:
+                output_path = os.path.join(identity_path, f"{identity_name}_0.jpg")
+                cv2.imwrite(output_path, img)
+                print(f"Successfully registered {identity_name}")
+            else:
+                print("No valid face detected in image")
+        
+        else:
+            # Recognition mode for single image
+            processed_img = handler.recognize(img)
+            if processed_img is not None:
+                cv2.imshow('Recognition Result', processed_img)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
+    
+    else:
+        # Video processing mode
+        STATE = True
+        FACE_NUM_THRESH = 20
+        
+        while STATE:
+            cam = cv2.VideoCapture(0)
+            if args['mode'] == 0:
+                # Registration mode with video
+                database_path = args['database']
+                identity_name = input('Input identity\'s name: ')
+                identity_path = os.path.normpath(os.path.join(database_path, identity_name))
+                if not os.path.exists(identity_path):
+                    os.makedirs(identity_path)
+                
+                face_count = len(glob.glob(os.path.join(identity_path, '*.png')) + \
+                            glob.glob(os.path.join(identity_path, '*.jpg')))
+                register_count = 0
+                features = []
+                
+                while True:
+                    ret, frame = cam.read()
+                    if not ret:
                         break
-            cv2.destroyAllWindows()
-            STATE = False
+                    
+                    feature, processed_frame = handler.register_identity(frame, identity_name)
+                    if len(feature) > 0:
+                        features.extend([feature])
+                        cv2.imwrite(os.path.join(identity_path, f"{identity_name}_{face_count}.jpg"), frame)
+                        face_count += 1
+                        register_count += 1
+                    
+                    if processed_frame is not None:
+                        cv2.imshow('Registration', processed_frame)
+                    if cv2.waitKey(1) == ord('q') or register_count >= FACE_NUM_THRESH:
+                        break
+                
+                cv2.destroyAllWindows()
+                cam.release()
+                args['mode'] = 1
+            
+            elif args['mode'] == 1:
+                # Recognition mode with video
+                handler.init_identity_database(args['database'])
+                while True:
+                    ret, frame = cam.read()
+                    if not ret:
+                        break
+                    
+                    processed_frame = handler.recognize(frame)
+                    if processed_frame is not None:
+                        cv2.imshow('Recognition', processed_frame)
+                    
+                    if cv2.waitKey(1) == ord('q'):
+                        break
+                
+                cv2.destroyAllWindows()
+                cam.release()
+                STATE = False
